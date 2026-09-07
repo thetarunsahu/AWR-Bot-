@@ -1,0 +1,37 @@
+# ROS / colcon
+build/
+install/
+log/
+.ros/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# C/C++
+*.o
+*.so
+*.a
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Gazebo / simulation caches
+.gz/
+.gazebo/
+
+# Temporary / generated
+*.tmp
+*.log
+*.bak
+*~
+
+# Large local recordings
+*.bag
+*.db3
+*.mcap

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>amr_navigation</name>
+  <version>0.1.0</version>
+  <description>SLAM, Nav2 configuration and mission-to-Nav2 adapter for the SIH26112 AMR.</description>
+  <maintainer email="tarunkumarsahu354@gmail.com">Tarun Kumar Sahu</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

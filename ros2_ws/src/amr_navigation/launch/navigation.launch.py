@@ -1,24 +1,79 @@
-from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
+"""Launch only the Nav2 servers required for NavigateToPose on this AMR."""
+
 import os
 
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch_ros.actions import Node
 
-def generate_launch_description():
-    nav2_share = get_package_share_directory("nav2_bringup")
-    amr_nav_share = get_package_share_directory("amr_navigation")
-    params_file = os.path.join(amr_nav_share, "config", "nav2_params.yaml")
-    nav2 = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(nav2_share, "launch", "navigation_launch.py")),
-        launch_arguments={"use_sim_time": "true", "params_file": params_file, "autostart": "true", "use_composition": "False"}.items(),
+
+def nav2_node(package: str, executable: str, name: str, params_file: str, remappings=None):
+    return Node(
+        package=package,
+        executable=executable,
+        name=name,
+        output='screen',
+        parameters=[params_file],
+        remappings=remappings or [],
     )
+
+
+def generate_launch_description() -> LaunchDescription:
+    amr_nav_share = get_package_share_directory('amr_navigation')
+    params_file = os.path.join(amr_nav_share, 'config', 'nav2_params.yaml')
+
+    # Keep the demo stack deliberately small. Jazzy's stock navigation_launch.py
+    # also starts route, docking and collision-monitor servers; those are not
+    # needed for our SKU -> rack NavigateToPose demo and make lifecycle startup
+    # depend on unrelated configuration.
+    controller = nav2_node(
+        'nav2_controller', 'controller_server', 'controller_server', params_file
+    )
+    smoother = nav2_node(
+        'nav2_smoother', 'smoother_server', 'smoother_server', params_file
+    )
+    planner = nav2_node(
+        'nav2_planner', 'planner_server', 'planner_server', params_file
+    )
+    behaviors = nav2_node(
+        'nav2_behaviors', 'behavior_server', 'behavior_server', params_file
+    )
+    bt_navigator = nav2_node(
+        'nav2_bt_navigator', 'bt_navigator', 'bt_navigator', params_file
+    )
+
+    lifecycle_manager = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_navigation',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'autostart': True,
+            'node_names': [
+                'controller_server',
+                'smoother_server',
+                'planner_server',
+                'behavior_server',
+                'bt_navigator',
+            ],
+        }],
+    )
+
     target_bridge = Node(
-        package="amr_navigation",
-        executable="target_pose_nav2_bridge.py",
-        name="target_pose_nav2_bridge",
-        output="screen",
-        parameters=[{"use_sim_time": True}],
+        package='amr_navigation',
+        executable='target_pose_nav2_bridge.py',
+        name='target_pose_nav2_bridge',
+        output='screen',
+        parameters=[{'use_sim_time': True}],
     )
-    return LaunchDescription([nav2, target_bridge])
+
+    return LaunchDescription([
+        controller,
+        smoother,
+        planner,
+        behaviors,
+        bt_navigator,
+        lifecycle_manager,
+        target_bridge,
+    ])

@@ -1,75 +1,74 @@
-# Demonstration rack approach poses only; replace with surveyed map coordinates.
+# Demo inventory aligned with the current Gazebo warehouse.
+#
+# Gazebo spawns the AMR at world (-10.0, -7.5) with yaw 0. SLAM/odom starts
+# at the robot origin, so the approach poses below are expressed in that local
+# map frame. They intentionally stop ~1.2 m south of each rack centre so the
+# robot does not drive into the rack collision geometry.
+#
 # x and y are metres in the map frame. yaw is radians about positive Z.
 items:
   SKU001:
     name: "Laptop"
-    rack: "RACK_A1"
+    rack: "RACK_A"
   SKU002:
     name: "Keyboard"
-    rack: "RACK_B2"
+    rack: "RACK_B"
   SKU003:
     name: "Mouse"
-    rack: "RACK_A2"
+    rack: "RACK_C"
   SKU004:
     name: "Monitor"
-    rack: "RACK_A3"
+    rack: "RACK_D"
   SKU005:
     name: "USB Cable"
-    rack: "RACK_B1"
+    rack: "RACK_E"
   SKU006:
     name: "Power Adapter"
-    rack: "RACK_B3"
+    rack: "RACK_F"
   SKU007:
     name: "Barcode Scanner"
-    rack: "RACK_C1"
+    rack: "RACK_A"
   SKU008:
     name: "Label Printer"
-    rack: "RACK_C2"
+    rack: "RACK_B"
   SKU009:
     name: "Packing Tape"
-    rack: "RACK_C3"
+    rack: "RACK_E"
   SKU010:
     name: "Shipping Box"
-    rack: "RACK_D1"
+    rack: "RACK_F"
 
 racks:
-  RACK_A1:
-    x: 2.0
-    y: 4.0
-    yaw: 0.0
-  RACK_B2:
-    x: 6.5
-    y: 1.5
-    yaw: 1.57
-  RACK_A2:
-    x: 2.0
-    y: 6.0
-    yaw: 0.0
-  RACK_A3:
-    x: 2.0
-    y: 8.0
-    yaw: 0.0
-  RACK_B1:
-    x: 6.5
-    y: 3.5
-    yaw: 1.57
-  RACK_B3:
-    x: 6.5
-    y: 5.5
-    yaw: 1.57
-  RACK_C1:
+  # Upper row in warehouse.sdf: world y = 4.0. Approach from south.
+  RACK_A:
+    x: 3.0
+    y: 10.2
+    yaw: 1.5707963267948966
+  RACK_B:
     x: 10.0
-    y: 4.0
-    yaw: 3.141592653589793
-  RACK_C2:
+    y: 10.2
+    yaw: 1.5707963267948966
+  RACK_C:
+    x: 17.0
+    y: 10.2
+    yaw: 1.5707963267948966
+
+  # Lower row in warehouse.sdf: world y = -3.5. Approach from south.
+  RACK_D:
+    x: 3.0
+    y: 2.7
+    yaw: 1.5707963267948966
+  RACK_E:
     x: 10.0
-    y: 6.0
-    yaw: 3.141592653589793
-  RACK_C3:
-    x: 10.0
-    y: 8.0
-    yaw: 3.141592653589793
-  RACK_D1:
-    x: 4.0
-    y: 10.0
-    yaw: -1.5707963267948966
+    y: 2.7
+    yaw: 1.5707963267948966
+  RACK_F:
+    x: 17.0
+    y: 2.7
+    yaw: 1.5707963267948966
+
+  # Reserved for the later rack -> packing-zone delivery phase.
+  PACKING_ZONE:
+    x: 19.0
+    y: -0.5
+    yaw: 0.0

@@ -19,8 +19,8 @@ Log-Line "Started: $(Get-Date -Format s)"
 Log-Line 'Purpose: multi-rack navigation + recovery + obstacle-route + delivery validation.'
 
 if (-not $SkipRestart) {
-    Log-Line 'Starting a clean release-candidate stack...'
-    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'final_demo.ps1') -NoBuild 2>&1 |
+    Log-Line 'Building and starting a clean release-candidate stack...'
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'final_demo.ps1') 2>&1 |
         Tee-Object -FilePath $Log -Append
     if ($LASTEXITCODE -ne 0) { throw 'Final demo stack did not start cleanly.' }
 }

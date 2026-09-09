@@ -91,7 +91,15 @@ def test_complete_delivery_mission_and_invalid_recovery() -> None:
         assert poses[0].pose.position.x == pytest.approx(-7.0)
         assert poses[0].pose.position.y == pytest.approx(2.7)
 
-        for value in ["NAVIGATION_GOAL_SENT", "NAVIGATION_ACTIVE", "NAVIGATION_SUCCEEDED"]:
+        # Recovery telemetry must not terminate or reset the active mission.
+        for value in [
+            "NAVIGATION_GOAL_SENT",
+            "NAVIGATION_ACTIVE",
+            "NAVIGATION_RETRYING attempt=1/2",
+            "NAVIGATION_GOAL_SENT",
+            "NAVIGATION_ACTIVE",
+            "NAVIGATION_SUCCEEDED",
+        ]:
             nav_status.publish(String(data=value))
             executor.spin_once(timeout_sec=0.05)
 
@@ -99,6 +107,7 @@ def test_complete_delivery_mission_and_invalid_recovery() -> None:
             executor,
             lambda: len(poses) == 2 and "PACKING_TARGET_GENERATED" in states(statuses),
         )
+        assert "RECOVERY_RETRY" in states(statuses)
         assert "ARRIVED_RACK" in states(statuses)
         assert "LOAD_ACQUIRED" in states(statuses)
         assert modules and modules[0].startswith("PICKUP task_id=TEST001 sku=SKU001")

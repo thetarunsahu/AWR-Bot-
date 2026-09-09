@@ -1,11 +1,7 @@
-# Demo inventory aligned with the current Gazebo warehouse.
-#
-# Gazebo spawns the AMR at world (-10.0, -7.5) with yaw 0. SLAM/odom starts
-# at the robot origin, so the approach poses below are expressed in that local
-# map frame. They intentionally stop ~1.2 m south of each rack centre so the
-# robot does not drive into the rack collision geometry.
-#
-# x and y are metres in the map frame. yaw is radians about positive Z.
+# SIH26112 demo inventory aligned with the Gazebo warehouse.
+# The AMR now spawns at world/map origin, so these are direct warehouse
+# coordinates. Each rack pose is an aisle-side approach point, not the rack
+# centre, preventing Nav2 from planning into collision geometry.
 items:
   SKU001:
     name: "Laptop"
@@ -30,7 +26,7 @@ items:
     rack: "RACK_A"
   SKU008:
     name: "Label Printer"
-    rack: "RACK_B"
+    rack: "RACK_C"
   SKU009:
     name: "Packing Tape"
     rack: "RACK_E"
@@ -39,36 +35,36 @@ items:
     rack: "RACK_F"
 
 racks:
-  # Upper row in warehouse.sdf: world y = 4.0. Approach from south.
+  # Upper row: approach from the south aisle, face north.
   RACK_A:
-    x: 3.0
-    y: 10.2
+    x: -7.0
+    y: 2.7
     yaw: 1.5707963267948966
   RACK_B:
-    x: 10.0
-    y: 10.2
+    x: 0.0
+    y: 2.7
     yaw: 1.5707963267948966
   RACK_C:
-    x: 17.0
-    y: 10.2
+    x: 7.0
+    y: 2.7
     yaw: 1.5707963267948966
 
-  # Lower row in warehouse.sdf: world y = -3.5. Approach from south.
+  # Lower row: approach from the north aisle, face south.
   RACK_D:
-    x: 3.0
-    y: 2.7
-    yaw: 1.5707963267948966
+    x: -7.0
+    y: -2.2
+    yaw: -1.5707963267948966
   RACK_E:
-    x: 10.0
-    y: 2.7
-    yaw: 1.5707963267948966
+    x: 0.0
+    y: -2.2
+    yaw: -1.5707963267948966
   RACK_F:
-    x: 17.0
-    y: 2.7
-    yaw: 1.5707963267948966
+    x: 7.0
+    y: -2.2
+    yaw: -1.5707963267948966
 
-  # Reserved for the later rack -> packing-zone delivery phase.
+  # Final destination inside the green packing-zone marker.
   PACKING_ZONE:
-    x: 19.0
-    y: -0.5
+    x: 9.0
+    y: -7.5
     yaw: 0.0

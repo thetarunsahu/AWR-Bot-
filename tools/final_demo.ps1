@@ -14,6 +14,18 @@ function Test-DockerEngine {
     return ($LASTEXITCODE -eq 0)
 }
 
+function Get-RosNodes {
+    $lines = @(& docker exec $Container bash -lc 'source /opt/ros/jazzy/setup.bash && cd /workspace/AWR-Bot-/ros2_ws && source install/setup.bash && ros2 node list' 2>$null)
+    if ($LASTEXITCODE -ne 0) { return @() }
+    return @($lines | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
+function Get-RosTopics {
+    $lines = @(& docker exec $Container bash -lc 'source /opt/ros/jazzy/setup.bash && cd /workspace/AWR-Bot-/ros2_ws && source install/setup.bash && ros2 topic list' 2>$null)
+    if ($LASTEXITCODE -ne 0) { return @() }
+    return @($lines | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
 Write-Host '=== SIH26112 FINAL AMR DEMO ==='
 
 if (-not (Test-DockerEngine)) {
@@ -62,26 +74,50 @@ if (-not $NoBuild) {
 }
 
 Write-Host 'Starting Gazebo + SLAM + Nav2 + Mission Manager...'
-& docker exec -d $Container bash -lc 'source /opt/ros/jazzy/setup.bash && cd /workspace/AWR-Bot-/ros2_ws && source install/setup.bash && ros2 launch amr_bringup full_demo.launch.py headless:=true rviz:=false > /tmp/amr_final.log 2>&1'
+& docker exec -d $Container bash -lc 'source /opt/ros/jazzy/setup.bash && cd /workspace/AWR-Bot-/ros2_ws && source install/setup.bash && exec ros2 launch amr_bringup full_demo.launch.py headless:=true rviz:=false > /tmp/amr_final.log 2>&1'
 if ($LASTEXITCODE -ne 0) { throw 'Failed to start final demo stack.' }
 
-Write-Host 'Waiting for autonomy stack...'
-Start-Sleep -Seconds 15
+$required = @(
+    '/slam_toolbox',
+    '/controller_server',
+    '/planner_server',
+    '/bt_navigator',
+    '/mission_manager',
+    '/target_pose_nav2_bridge'
+)
 
-$check = & docker exec $Container bash -lc 'source /opt/ros/jazzy/setup.bash && cd /workspace/AWR-Bot-/ros2_ws && source install/setup.bash && ros2 node list && echo ---TOPICS--- && ros2 topic list | grep -E "^/map$|^/scan$|^/odom$|^/amr/"'
-$check | Write-Host
-
-$required = @('/slam_toolbox', '/controller_server', '/planner_server', '/bt_navigator', '/mission_manager', '/target_pose_nav2_bridge')
-$missing = @()
-foreach ($name in $required) {
-    if (-not ($check -contains $name)) { $missing += $name }
+Write-Host 'Waiting for autonomy stack (up to 75 seconds)...'
+$nodes = @()
+$missing = $required
+for ($attempt = 1; $attempt -le 25; $attempt++) {
+    Start-Sleep -Seconds 3
+    $nodes = Get-RosNodes
+    $missing = @($required | Where-Object { $nodes -notcontains $_ })
+    if ($missing.Count -eq 0) { break }
+    if (($attempt % 5) -eq 0) {
+        Write-Host "  still starting... missing: $($missing -join ', ')"
+    }
 }
 
+$topics = Get-RosTopics
+Write-Host ''
+Write-Host '=== ROS NODES ==='
+$nodes | Sort-Object | Write-Host
+Write-Host '=== CRITICAL TOPICS ==='
+@($topics | Where-Object { $_ -in @('/map','/scan','/odom','/cmd_vel') -or $_ -like '/amr/*' } | Sort-Object) | Write-Host
+
 if ($missing.Count -gt 0) {
-    Write-Host "Stack started but these nodes are missing: $($missing -join ', ')"
+    Write-Host ''
+    Write-Host "Stack did not become ready. Missing nodes: $($missing -join ', ')"
     Write-Host 'Last launch logs:'
-    & docker exec $Container bash -lc 'tail -n 100 /tmp/amr_final.log'
+    & docker exec $Container bash -lc 'tail -n 140 /tmp/amr_final.log'
     exit 2
+}
+
+$requiredTopics = @('/map', '/scan', '/odom', '/amr/task_request', '/amr/mission_status', '/amr/navigation_status')
+$missingTopics = @($requiredTopics | Where-Object { $topics -notcontains $_ })
+if ($missingTopics.Count -gt 0) {
+    Write-Host "Warning: core nodes are active, but these topics are not visible yet: $($missingTopics -join ', ')"
 }
 
 Write-Host ''

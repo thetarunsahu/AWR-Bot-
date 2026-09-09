@@ -8,7 +8,9 @@ $Container = 'amr-ros-jazzy'
 $Image = 'amr-ros-jazzy-ready'
 
 function Test-DockerEngine {
-    & docker info *> $null
+    # Run through cmd.exe so PowerShell 5.1 does not convert Docker's stderr
+    # into a terminating NativeCommandError while Docker Desktop is starting.
+    & cmd.exe /d /c "docker info >nul 2>nul"
     return ($LASTEXITCODE -eq 0)
 }
 
@@ -19,10 +21,10 @@ if (-not (Test-DockerEngine)) {
     if (-not (Test-Path $desktop)) {
         throw 'Docker Desktop was not found.'
     }
-    Write-Host 'Starting Docker Desktop...'
+    Write-Host 'Docker engine is offline. Starting Docker Desktop...'
     Start-Process $desktop
     $ready = $false
-    for ($i = 0; $i -lt 60; $i++) {
+    for ($i = 0; $i -lt 90; $i++) {
         Start-Sleep -Seconds 2
         if (Test-DockerEngine) {
             $ready = $true
@@ -30,9 +32,11 @@ if (-not (Test-DockerEngine)) {
         }
     }
     if (-not $ready) {
-        throw 'Docker engine did not become ready in time.'
+        throw 'Docker engine did not become ready within 3 minutes. Open Docker Desktop and wait until Engine is running, then rerun this script.'
     }
 }
+
+Write-Host 'Docker engine ready.'
 
 $existing = (& docker ps -a --format '{{.Names}}') -contains $Container
 if (-not $existing) {
@@ -49,7 +53,7 @@ if (-not $existing) {
     if ($LASTEXITCODE -ne 0) { throw 'Failed to restart ROS container.' }
 }
 
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 3
 
 if (-not $NoBuild) {
     Write-Host 'Building ROS 2 workspace...'
@@ -76,13 +80,13 @@ foreach ($name in $required) {
 if ($missing.Count -gt 0) {
     Write-Host "Stack started but these nodes are missing: $($missing -join ', ')"
     Write-Host 'Last launch logs:'
-    & docker exec $Container bash -lc 'tail -n 80 /tmp/amr_final.log'
+    & docker exec $Container bash -lc 'tail -n 100 /tmp/amr_final.log'
     exit 2
 }
 
 Write-Host ''
 Write-Host 'FINAL STACK READY.'
 Write-Host 'Run a mission from another PowerShell:'
-Write-Host '  .\tools\run_mission.ps1 SKU004'
+Write-Host '  powershell -ExecutionPolicy Bypass -File .\tools\run_mission.ps1 SKU004'
 Write-Host 'To open Gazebo GUI:'
-Write-Host '  .\tools\show_gazebo.ps1'
+Write-Host '  powershell -ExecutionPolicy Bypass -File .\tools\show_gazebo.ps1'

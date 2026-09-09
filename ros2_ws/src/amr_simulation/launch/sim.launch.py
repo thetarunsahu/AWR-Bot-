@@ -61,6 +61,8 @@ def generate_launch_description():
         }.items(),
     )
 
+    # Spawn at the Gazebo world origin so the initial odom/map frame and the
+    # warehouse coordinates are intentionally aligned for the SIH demo.
     spawn_robot = TimerAction(
         period=2.0,
         actions=[
@@ -74,9 +76,9 @@ def generate_launch_description():
                     "-name",
                     "sih26112_amr",
                     "-x",
-                    "-10.0",
+                    "0.0",
                     "-y",
-                    "-7.5",
+                    "0.0",
                     "-z",
                     "0.02",
                     "-allow_renaming",

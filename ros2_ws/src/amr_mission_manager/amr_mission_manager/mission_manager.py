@@ -128,6 +128,13 @@ class MissionManager(Node):
                 f'phase={self.phase} destination={destination}',
                 request,
             )
+        elif nav_state.startswith('NAVIGATION_RETRYING'):
+            retry_detail = nav_state.removeprefix('NAVIGATION_RETRYING').strip()
+            self._publish_status(
+                'RECOVERY_RETRY',
+                f'phase={self.phase} destination={destination} {retry_detail}'.strip(),
+                request,
+            )
         elif nav_state == 'NAVIGATION_SUCCEEDED':
             self._handle_navigation_success()
         elif nav_state in {

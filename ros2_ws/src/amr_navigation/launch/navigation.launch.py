@@ -65,7 +65,11 @@ def generate_launch_description() -> LaunchDescription:
         executable='target_pose_nav2_bridge.py',
         name='target_pose_nav2_bridge',
         output='screen',
-        parameters=[{'use_sim_time': True}],
+        parameters=[{
+            'use_sim_time': True,
+            'max_retries': 2,
+            'retry_delay_sec': 1.0,
+        }],
     )
 
     return LaunchDescription([

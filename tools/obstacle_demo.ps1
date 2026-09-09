@@ -10,8 +10,8 @@ $Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $Log = Join-Path $EvidenceDir "obstacle-demo-$Stamp.txt"
 
 Write-Host '=== SIH26112 OBSTACLE AVOIDANCE DEMO ==='
-Write-Host 'Resetting the robot to the warehouse origin for a repeatable route...'
-& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'final_demo.ps1') -NoBuild 2>&1 |
+Write-Host 'Building and resetting the robot to the warehouse origin...'
+& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'final_demo.ps1') 2>&1 |
     Tee-Object -FilePath $Log -Append
 if ($LASTEXITCODE -ne 0) { throw 'Could not start clean demo stack.' }
 

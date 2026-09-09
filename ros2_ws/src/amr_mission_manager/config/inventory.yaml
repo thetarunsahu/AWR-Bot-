@@ -1,7 +1,8 @@
 # SIH26112 demo inventory aligned with the Gazebo warehouse.
-# The AMR now spawns at world/map origin, so these are direct warehouse
-# coordinates. Each rack pose is an aisle-side approach point, not the rack
-# centre, preventing Nav2 from planning into collision geometry.
+# The AMR spawns at world/map origin, so these are direct warehouse coordinates.
+# Rack poses are deliberately placed well inside aisle free-space rather than at
+# rack collision edges. This gives Nav2 extra inflation / localization margin
+# while still stopping the robot directly in front of the requested rack.
 items:
   SKU001:
     name: "Laptop"
@@ -35,32 +36,32 @@ items:
     rack: "RACK_F"
 
 racks:
-  # Upper row: approach from the south aisle, face north.
+  # Upper row rack front edge is near y=3.5. Stop at y=2.2, facing north.
   RACK_A:
     x: -7.0
-    y: 2.7
+    y: 2.2
     yaw: 1.5707963267948966
   RACK_B:
     x: 0.0
-    y: 2.7
+    y: 2.2
     yaw: 1.5707963267948966
   RACK_C:
     x: 7.0
-    y: 2.7
+    y: 2.2
     yaw: 1.5707963267948966
 
-  # Lower row: approach from the north aisle, face south.
+  # Lower row rack front edge is near y=-3.0. Stop at y=-1.7, facing south.
   RACK_D:
     x: -7.0
-    y: -2.2
+    y: -1.7
     yaw: -1.5707963267948966
   RACK_E:
     x: 0.0
-    y: -2.2
+    y: -1.7
     yaw: -1.5707963267948966
   RACK_F:
     x: 7.0
-    y: -2.2
+    y: -1.7
     yaw: -1.5707963267948966
 
   # Final destination inside the green packing-zone marker.

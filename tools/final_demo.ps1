@@ -8,8 +8,6 @@ $Container = 'amr-ros-jazzy'
 $Image = 'amr-ros-jazzy-ready'
 
 function Test-DockerEngine {
-    # Run through cmd.exe so PowerShell 5.1 does not convert Docker's stderr
-    # into a terminating NativeCommandError while Docker Desktop is starting.
     & cmd.exe /d /c "docker info >nul 2>nul"
     return ($LASTEXITCODE -eq 0)
 }
@@ -22,6 +20,12 @@ function Get-RosNodes {
 
 function Get-RosTopics {
     $lines = @(& docker exec $Container bash -lc 'source /opt/ros/jazzy/setup.bash && cd /workspace/AWR-Bot-/ros2_ws && source install/setup.bash && ros2 topic list' 2>$null)
+    if ($LASTEXITCODE -ne 0) { return @() }
+    return @($lines | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
+function Get-RosServices {
+    $lines = @(& docker exec $Container bash -lc 'source /opt/ros/jazzy/setup.bash && cd /workspace/AWR-Bot-/ros2_ws && source install/setup.bash && ros2 service list' 2>$null)
     if ($LASTEXITCODE -ne 0) { return @() }
     return @($lines | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
@@ -100,11 +104,14 @@ for ($attempt = 1; $attempt -le 25; $attempt++) {
 }
 
 $topics = Get-RosTopics
+$services = Get-RosServices
 Write-Host ''
 Write-Host '=== ROS NODES ==='
 $nodes | Sort-Object | Write-Host
 Write-Host '=== CRITICAL TOPICS ==='
 @($topics | Where-Object { $_ -in @('/map','/scan','/odom','/cmd_vel') -or $_ -like '/amr/*' } | Sort-Object) | Write-Host
+Write-Host '=== RECOVERY SERVICES ==='
+@($services | Where-Object { $_ -like '*clear_entirely*' } | Sort-Object) | Write-Host
 
 if ($missing.Count -gt 0) {
     Write-Host ''
@@ -114,15 +121,33 @@ if ($missing.Count -gt 0) {
     exit 2
 }
 
-$requiredTopics = @('/map', '/scan', '/odom', '/amr/task_request', '/amr/mission_status', '/amr/navigation_status')
+$requiredTopics = @(
+    '/map', '/scan', '/odom', '/cmd_vel',
+    '/amr/task_request', '/amr/mission_status', '/amr/navigation_status',
+    '/amr/module_command'
+)
 $missingTopics = @($requiredTopics | Where-Object { $topics -notcontains $_ })
 if ($missingTopics.Count -gt 0) {
-    Write-Host "Warning: core nodes are active, but these topics are not visible yet: $($missingTopics -join ', ')"
+    Write-Host "Stack is missing required topics: $($missingTopics -join ', ')"
+    exit 3
+}
+
+$requiredServices = @(
+    '/global_costmap/clear_entirely_global_costmap',
+    '/local_costmap/clear_entirely_local_costmap'
+)
+$missingServices = @($requiredServices | Where-Object { $services -notcontains $_ })
+if ($missingServices.Count -gt 0) {
+    Write-Host "Stack is missing recovery services: $($missingServices -join ', ')"
+    exit 4
 }
 
 Write-Host ''
 Write-Host 'FINAL STACK READY.'
+Write-Host 'Recovery layer: costmap clear + bounded Nav2 retries enabled.'
 Write-Host 'Run a mission from another PowerShell:'
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\tools\run_mission.ps1 SKU004'
 Write-Host 'To open Gazebo GUI:'
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\tools\show_gazebo.ps1'
+Write-Host 'To open RViz judge view:'
+Write-Host '  powershell -ExecutionPolicy Bypass -File .\tools\show_rviz.ps1'

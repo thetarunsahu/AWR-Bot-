@@ -1,116 +1,166 @@
 # SIH26112 — Modular Autonomous Warehouse Robot (AMR)
 
-> A modular Autonomous Mobile Robot platform for smart warehouse automation, developed for Smart India Hackathon 2026.
+A modular Autonomous Mobile Robot platform for Smart India Hackathon 2026, built to demonstrate autonomous warehouse navigation, SKU-to-rack mission planning, obstacle-aware motion, modular payload handling, and rack-to-packing delivery.
 
-## Project Goal
-
-Build a **universal autonomous mobile robot base** that can navigate an indoor warehouse safely and accept interchangeable task modules. The first target module is a **bin / pallet handling attachment**; future modules can include inventory scanning, conveyor transfer, inspection, and robotic picking.
-
-## Current Development Tracks
-
-| Track | Owner | Current Focus |
-|---|---|---|
-| System Architecture & Fusion CAD | Tarun | AMR specifications, modular interface, CAD architecture, integration |
-| ROS 2 & Gazebo Simulation | Yashraj | robot model, motion, LiDAR, bridge, SLAM/Nav2 |
-| Physical Prototype & Hardware | Aaditya | chassis, motors, electronics, sensors, wiring, attachment hardware |
-
-See [`docs/TEAM_RESPONSIBILITIES.md`](docs/TEAM_RESPONSIBILITIES.md) and the individual files under [`team/`](team/) for detailed work ownership.
-
-## System Overview
+## What the prototype demonstrates
 
 ```text
-Warehouse Task / Mission
-          |
-          v
-   Mission Manager
-          |
-          v
-+---------------------------+
-|        ROS 2 Stack        |
-| Localization / SLAM       |
-| Nav2 + Path Planning      |
-| Obstacle Avoidance        |
-+-------------+-------------+
-              |
-     Sensor Fusion / TF
-              |
-   +----------+----------+
-   | LiDAR | IMU | Encoder|
-   +----------+----------+
-              |
-              v
-      Motor Controller
-              |
-              v
-      4-Wheel AMR Base
-              |
-              v
-   Universal Module Interface
-       /        |        \
- Pallet/    Scanner    Conveyor
- Bin Lift     Module      Module
+Warehouse SKU / Task
+        ↓
+Inventory Lookup
+        ↓
+Rack Resolution
+        ↓
+Mission Manager
+        ↓
+SLAM + Nav2
+        ↓
+LiDAR-aware Autonomous Navigation
+        ↓
+Rack Arrival
+        ↓
+Modular PICKUP Interface
+        ↓
+Packing Zone Navigation
+        ↓
+Modular DROP Interface
+        ↓
+MISSION_COMPLETE
 ```
 
-## Repository Layout
+The software interface is deliberately independent from the payload mechanism. In simulation `/amr/module_command` publishes PICKUP and DROP events; the same interface can later drive a real bin lift, pallet module, conveyor, scanner, or robotic attachment.
+
+## Current software stack
+
+- **ROS 2 Jazzy** — middleware and robot software
+- **Gazebo Sim** — warehouse and AMR simulation
+- **SLAM Toolbox** — online mapping / localization for the SIH demo
+- **Nav2** — global planning, local control and obstacle-aware navigation
+- **2D LiDAR** — `/scan` obstacle observations
+- **Differential drive odometry** — `/odom`
+- **Mission Manager** — SKU → rack → pickup → packing → drop state machine
+- **Nav2 recovery adapter** — bounded retry with local/global costmap clearing
+- **RViz judge view** — map, LiDAR, robot, costmap and planned path
+
+## Demo warehouse
+
+The Gazebo world contains six rack destinations, a packing zone, walls and a visible centre-aisle obstacle crate. Inventory approach poses are placed in aisle-side free space rather than at rack collision centres.
+
+| Demo SKU | Destination |
+|---|---|
+| SKU001 / SKU007 | RACK_A |
+| SKU002 | RACK_B |
+| SKU003 / SKU008 | RACK_C |
+| SKU004 | RACK_D |
+| SKU005 / SKU009 | RACK_E |
+| SKU006 / SKU010 | RACK_F |
+
+## Repository layout
 
 ```text
 AWR-Bot-/
-├── README.md
-├── CONTRIBUTING.md
-├── docs/                     # architecture, roadmap, status, integration
-├── team/                     # member-wise responsibilities
-├── legacy/
-│   └── yashraj-handover/     # original simulation handover preserved unchanged
-├── ros2_ws/                  # clean ROS 2 workspace (development target)
-├── simulation/               # Gazebo worlds / models / test assets
-├── cad/                      # Fusion design exports, meshes, manufacturing notes
-├── hardware/                 # wiring, BOM, electronics, mechanical notes
-├── firmware/                 # microcontroller / motor-controller code
-└── media/                    # renders, screenshots, demo media
+├── docs/                     # architecture, final demo and validation docs
+├── ros2_ws/
+│   └── src/
+│       ├── amr_description/  # URDF/Xacro robot description
+│       ├── amr_simulation/   # Gazebo launch/world/bridge
+│       ├── amr_navigation/   # SLAM, Nav2, RViz and target bridge
+│       ├── amr_mission_manager/
+│       └── amr_bringup/      # full demo orchestration
+├── tools/                    # Windows one-command demo/test helpers
+├── cad/
+├── hardware/
+├── firmware/
+├── media/
+└── legacy/yashraj-handover/  # original handover preserved
 ```
 
-## Current Status
+## One-command startup on Windows
 
-Yashraj's initial ROS 2 / Gazebo handover has been preserved under `legacy/yashraj-handover/`. It establishes the simulation foundation, including a basic robot model, Gazebo world, wheel joints, `cmd_vel` controller, odometry configuration, and LiDAR foundation.
+From the repository root in PowerShell:
 
-The next priority is **not** to jump directly to SLAM/Nav2. First we must make the base motion chain reliable:
-
-```text
-ROS 2 /cmd_vel
-      -> ROS-Gazebo bridge
-      -> Gazebo DiffDrive
-      -> wheel joints
-      -> robot motion
+```powershell
+git pull --ff-only origin feature/amr-mission-manager
+powershell -ExecutionPolicy Bypass -File .\tools\final_demo.ps1
 ```
 
-After motion is verified:
+The launcher starts/restarts Docker Desktop when required, builds the ROS workspace, launches Gazebo headless, SLAM Toolbox, the lean Nav2 stack, the target bridge and Mission Manager, then checks critical ROS nodes/topics.
 
-1. Bridge LiDAR data into ROS 2.
-2. Validate TF and odometry.
-3. Add obstacle avoidance.
-4. Add SLAM.
-5. Integrate Nav2.
-6. Replace the placeholder robot geometry with the final CAD-derived AMR model.
-7. Integrate the physical prototype.
+### Open Gazebo
 
-Detailed status: [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\show_gazebo.ps1
+```
 
-## Engineering Principle
+### Open RViz judge view
 
-The physical prototype, Gazebo simulation, and Fusion CAD are **three representations of the same robot**, not separate projects. Dimensions, frame names, sensor placement, wheel geometry, and modular-interface definitions should stay synchronized.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\show_rviz.ps1
+```
 
-## SIH Demo Target
+### Run one autonomous mission
 
-**Scaled functional prototype + engineering CAD + simulation validation** demonstrating:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\run_mission.ps1 SKU004
+```
 
-- autonomous warehouse navigation,
-- obstacle detection and avoidance,
-- modular payload interface,
-- one functional bin/pallet handling module,
-- Fusion-based design and optimization,
-- a clear path from prototype to industrial AMR.
+### Judge presentation mode
 
----
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\judge_demo.ps1 SKU004
+```
 
-**Team:** Tarun · Yashraj · Aaditya  
-**Problem Statement:** SIH26112
+For Gazebo + RViz:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\judge_demo.ps1 SKU006 -WithRViz
+```
+
+## Reliability features
+
+The release-candidate Nav2 adapter does not immediately kill a warehouse mission on the first navigation abort. It can clear both local and global Nav2 costmaps, wait briefly, refresh the goal timestamp, and retry a bounded number of times. Mission status exposes this as `RECOVERY_RETRY`; an unrecoverable mission still exits cleanly as `MISSION_FAILED` rather than looping forever.
+
+Nav2 parameters are tuned for the demo AMR with a larger local costmap, more progress time, conservative speed, collision detection, obstacle layers and rack-approach tolerance.
+
+## Final validation
+
+The software is considered final only when all six rack destinations pass on the actual demo machine.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\final_validation.ps1
+```
+
+This validates SKU001–SKU006 sequentially and stores evidence in `media/evidence/`.
+
+Dedicated obstacle route:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\obstacle_demo.ps1
+```
+
+System evidence snapshot:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\capture_evidence.ps1
+```
+
+See:
+
+- [`docs/FINAL_DEMO.md`](docs/FINAL_DEMO.md)
+- [`docs/FINAL_TEST_CHECKLIST.md`](docs/FINAL_TEST_CHECKLIST.md)
+- [`docs/DEMO_RECORDING_SHOTLIST.md`](docs/DEMO_RECORDING_SHOTLIST.md)
+
+## Demonstrated milestone
+
+A complete **SKU004 → RACK_D → simulated pickup → PACKING_ZONE → simulated drop → MISSION_COMPLETE** run has already executed end-to-end. The current branch is a release candidate containing additional multi-rack recovery and presentation tooling; the final six-rack validation is intentionally the release gate before merge/freeze.
+
+## Team
+
+| Track | Owner | Responsibility |
+|---|---|---|
+| System Architecture / CAD / Integration | Tarun | AMR architecture, modularity, Fusion CAD, final integration |
+| ROS 2 / Gazebo / Navigation | Yashraj | simulation and autonomy implementation |
+| Physical Prototype / Hardware | Aaditya | chassis, motors, electronics, sensors and attachment hardware |
+
+**Problem Statement:** SIH26112  
+**Project:** Modular Autonomous Mobile Robot Platform for Smart Warehouse Automation

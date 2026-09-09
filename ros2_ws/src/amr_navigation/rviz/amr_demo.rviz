@@ -1,0 +1,119 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Selection
+    Name: Selection
+  - Class: rviz_common/Tool Properties
+    Name: Tool Properties
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Background Color: 32; 34; 38
+    Fixed Frame: map
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Warehouse Grid
+      Enabled: true
+      Alpha: 0.35
+      Cell Size: 1
+      Plane: XY
+    - Class: rviz_default_plugins/Map
+      Name: SLAM Map
+      Enabled: true
+      Alpha: 0.75
+      Color Scheme: map
+      Topic:
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        Value: /map
+      Update Topic:
+        Value: /map_updates
+    - Class: rviz_default_plugins/Map
+      Name: Global Costmap
+      Enabled: true
+      Alpha: 0.35
+      Color Scheme: costmap
+      Topic:
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        Value: /global_costmap/costmap
+    - Class: rviz_default_plugins/Map
+      Name: Local Costmap
+      Enabled: false
+      Alpha: 0.45
+      Color Scheme: costmap
+      Topic:
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        Value: /local_costmap/costmap
+    - Class: rviz_default_plugins/LaserScan
+      Name: LiDAR
+      Enabled: true
+      Topic:
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        Value: /scan
+      Size (Pixels): 3
+      Style: Points
+      Decay Time: 0
+    - Class: rviz_default_plugins/RobotModel
+      Name: AMR Robot
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        Value: /robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+    - Class: rviz_default_plugins/TF
+      Name: TF Frames
+      Enabled: false
+      Frame Timeout: 15
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+    - Class: rviz_default_plugins/Path
+      Name: Nav2 Global Path
+      Enabled: true
+      Topic:
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        Value: /plan
+      Line Style: Lines
+      Line Width: 0.04
+      Buffer Length: 1
+    - Class: rviz_default_plugins/Path
+      Name: Nav2 Local Path
+      Enabled: true
+      Topic:
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        Value: /local_plan
+      Line Style: Lines
+      Line Width: 0.03
+      Buffer Length: 1
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+    - Class: rviz_default_plugins/SetInitialPose
+      Topic:
+        Value: /initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Value: /goal_pose
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Judge Top View
+      Angle: 0
+      Scale: 35
+      X: 0
+      Y: 0
+Window Geometry:
+  Height: 900
+  Width: 1400

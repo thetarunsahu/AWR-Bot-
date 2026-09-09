@@ -16,13 +16,22 @@ function Log-Line([string]$Text) {
 
 Log-Line '=== SIH26112 FINAL VALIDATION ==='
 Log-Line "Started: $(Get-Date -Format s)"
-Log-Line 'Purpose: multi-rack navigation + recovery + obstacle-route + delivery validation.'
+Log-Line 'Purpose: software preflight + multi-rack navigation + recovery + obstacle-route + delivery validation.'
 
 if (-not $SkipRestart) {
     Log-Line 'Building and starting a clean release-candidate stack...'
     & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'final_demo.ps1') 2>&1 |
         Tee-Object -FilePath $Log -Append
     if ($LASTEXITCODE -ne 0) { throw 'Final demo stack did not start cleanly.' }
+}
+
+Log-Line ''
+Log-Line '--- SOFTWARE PREFLIGHT ---'
+& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'preflight.ps1') 2>&1 |
+    Tee-Object -FilePath $Log -Append
+if ($LASTEXITCODE -ne 0) {
+    Log-Line 'FINAL VALIDATION RESULT: FAIL - PREFLIGHT'
+    exit 2
 }
 
 # SKU006 is first from the origin because its route exercises the right-side

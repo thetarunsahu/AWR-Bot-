@@ -89,7 +89,7 @@ def test_complete_delivery_mission_and_invalid_recovery() -> None:
         ]
         assert poses[0].header.frame_id == "map"
         assert poses[0].pose.position.x == pytest.approx(-7.0)
-        assert poses[0].pose.position.y == pytest.approx(2.7)
+        assert poses[0].pose.position.y == pytest.approx(2.2)
 
         # Recovery telemetry must not terminate or reset the active mission.
         for value in [

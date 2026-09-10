@@ -37,7 +37,7 @@ def states(statuses: list[str]) -> list[str]:
     return [status.split(" ", 1)[0] for status in statuses]
 
 
-def test_complete_delivery_mission_and_invalid_recovery() -> None:
+def test_complete_delivery_staging_cancel_and_invalid_recovery() -> None:
     context = Context()
     rclpy.init(args=[], context=context, domain_id=100 + os.getpid() % 100)
     executor = SingleThreadedExecutor(context=context)
@@ -55,6 +55,7 @@ def test_complete_delivery_mission_and_invalid_recovery() -> None:
         poses: list[PoseStamped] = []
         statuses: list[str] = []
         modules: list[str] = []
+        navigation_cancels: list[str] = []
         target_subscription = observer.create_subscription(
             PoseStamped, "/amr/target_pose", poses.append, 10
         )
@@ -64,7 +65,11 @@ def test_complete_delivery_mission_and_invalid_recovery() -> None:
         module_subscription = observer.create_subscription(
             String, "/amr/module_command", lambda m: modules.append(m.data), 10
         )
+        nav_cancel_subscription = observer.create_subscription(
+            String, "/amr/navigation_cancel", lambda m: navigation_cancels.append(m.data), 10
+        )
         requests = observer.create_publisher(String, "/amr/task_request", 10)
+        cancel_requests = observer.create_publisher(String, "/amr/cancel_request", 10)
         nav_status = observer.create_publisher(String, "/amr/navigation_status", 10)
 
         executor.add_node(observer)
@@ -72,12 +77,15 @@ def test_complete_delivery_mission_and_invalid_recovery() -> None:
         spin_until(
             executor,
             lambda: requests.get_subscription_count() > 0
+            and cancel_requests.get_subscription_count() > 0
             and nav_status.get_subscription_count() > 0
             and target_subscription.get_publisher_count() > 0
             and status_subscription.get_publisher_count() > 0
-            and module_subscription.get_publisher_count() > 0,
+            and module_subscription.get_publisher_count() > 0
+            and nav_cancel_subscription.get_publisher_count() > 0,
         )
 
+        # Fresh startup: first task goes directly from origin to the rack.
         requests.publish(String(data=json.dumps({
             "task_id": "TEST001",
             "sku": "SKU001",
@@ -95,7 +103,7 @@ def test_complete_delivery_mission_and_invalid_recovery() -> None:
         for value in [
             "NAVIGATION_GOAL_SENT",
             "NAVIGATION_ACTIVE",
-            "NAVIGATION_RETRYING attempt=1/2",
+            "NAVIGATION_RETRYING attempt=1/1 reason=no_progress",
             "NAVIGATION_GOAL_SENT",
             "NAVIGATION_ACTIVE",
             "NAVIGATION_SUCCEEDED",
@@ -123,10 +131,43 @@ def test_complete_delivery_mission_and_invalid_recovery() -> None:
         assert len(modules) == 2
         assert modules[1].startswith("DROP task_id=TEST001 sku=SKU001")
 
-        # A terminal mission clears BUSY state; the manager can accept another request.
+        # After a packing delivery, the next task must first use STAGING_ZONE.
         statuses.clear()
         requests.publish(String(data=json.dumps({
             "task_id": "TEST002",
+            "sku": "SKU006",
+            "action": "DELIVER",
+        })))
+        spin_until(
+            executor,
+            lambda: len(poses) == 3 and "STAGING_TARGET_GENERATED" in states(statuses),
+        )
+        assert states(statuses)[:3] == [
+            "TASK_RECEIVED", "SKU_RESOLVED", "STAGING_TARGET_GENERATED"
+        ]
+        assert poses[2].pose.position.x == pytest.approx(3.5)
+        assert poses[2].pose.position.y == pytest.approx(-1.8)
+
+        for value in ["NAVIGATION_GOAL_SENT", "NAVIGATION_ACTIVE", "NAVIGATION_SUCCEEDED"]:
+            nav_status.publish(String(data=value))
+            executor.spin_once(timeout_sec=0.05)
+        spin_until(
+            executor,
+            lambda: len(poses) == 4 and "ARRIVED_STAGING" in states(statuses)
+            and "RACK_TARGET_GENERATED" in states(statuses),
+        )
+        assert poses[3].pose.position.x == pytest.approx(7.0)
+        assert poses[3].pose.position.y == pytest.approx(-1.7)
+
+        # Timeout/operator cancellation must stop Nav2 and release BUSY state.
+        cancel_requests.publish(String(data="TEST002"))
+        spin_until(executor, lambda: "MISSION_CANCELED" in states(statuses))
+        spin_until(executor, lambda: navigation_cancels == ["TEST002"])
+
+        # A rejected request after cancellation proves the manager is no longer BUSY.
+        statuses.clear()
+        requests.publish(String(data=json.dumps({
+            "task_id": "TEST003",
             "sku": "NO_SUCH_SKU",
             "action": "DELIVER",
         })))

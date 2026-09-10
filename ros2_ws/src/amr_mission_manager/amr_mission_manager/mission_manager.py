@@ -46,6 +46,7 @@ class MissionManager(Node):
             inventory_path = self.get_parameter('inventory_file').value
             self.inventory = InventoryManager(inventory_path)
             self.packing_zone = self.inventory.get_rack('PACKING_ZONE')
+            self.staging_zone = self.inventory.get_rack('STAGING_ZONE')
         except Exception as exc:
             self.get_logger().error(f'Cannot load warehouse inventory: {exc}')
             self.destroy_node()
@@ -54,6 +55,11 @@ class MissionManager(Node):
         self.active_request: TaskRequest | None = None
         self.active_rack: RackLocation | None = None
         self.phase: str | None = None
+        # A fresh launch starts at the Gazebo origin and can go straight to a
+        # rack. After any completed/failed/cancelled mission, the robot may be
+        # near the packing zone or elsewhere, so the next task first transits
+        # through a known-free aisle staging point.
+        self.next_task_via_staging = False
 
         self.target_publisher = self.create_publisher(
             PoseStamped, '/amr/target_pose', 10,
@@ -64,8 +70,14 @@ class MissionManager(Node):
         self.module_publisher = self.create_publisher(
             String, '/amr/module_command', 10,
         )
+        self.navigation_cancel_publisher = self.create_publisher(
+            String, '/amr/navigation_cancel', 10,
+        )
         self.task_subscription = self.create_subscription(
             String, '/amr/task_request', self.handle_task_request, 10,
+        )
+        self.cancel_subscription = self.create_subscription(
+            String, '/amr/cancel_request', self.handle_cancel_request, 10,
         )
         self.navigation_subscription = self.create_subscription(
             String, '/amr/navigation_status', self.handle_navigation_status, 10,
@@ -75,7 +87,7 @@ class MissionManager(Node):
         )
 
     def handle_task_request(self, message: String) -> None:
-        """Resolve an SKU and start the first navigation leg to its rack."""
+        """Resolve an SKU and start a resilient route to its rack."""
         try:
             request = parse_task_request(message.data)
         except InvalidRequestError as exc:
@@ -102,13 +114,37 @@ class MissionManager(Node):
 
         self.active_request = request
         self.active_rack = rack
-        self.phase = 'TO_RACK'
-
         self._publish_status('SKU_RESOLVED', f'rack={rack.rack_id}', request)
-        self._publish_target(rack, 'RACK_TARGET_GENERATED')
+
+        if self.next_task_via_staging:
+            self.phase = 'TO_STAGING'
+            self._publish_target(self.staging_zone, 'STAGING_TARGET_GENERATED')
+        else:
+            self.phase = 'TO_RACK'
+            self._publish_target(rack, 'RACK_TARGET_GENERATED')
+
+    def handle_cancel_request(self, message: String) -> None:
+        """Cancel the active warehouse mission and release BUSY state."""
+        if self.active_request is None:
+            return
+
+        requested_task = message.data.strip()
+        active = self.active_request
+        if requested_task not in {'', 'ALL', active.task_id}:
+            return
+
+        destination = self._current_destination_name()
+        self.navigation_cancel_publisher.publish(String(data=active.task_id))
+        self._publish_status(
+            'MISSION_CANCELED',
+            f'operator_or_timeout_cancel phase={self.phase} destination={destination}',
+            active,
+        )
+        self.next_task_via_staging = True
+        self._clear_active_mission()
 
     def handle_navigation_status(self, message: String) -> None:
-        """Advance the mission state machine from rack pickup to delivery."""
+        """Advance the mission state machine from staging to rack to delivery."""
         if self.active_request is None or self.phase is None:
             return
 
@@ -148,6 +184,7 @@ class MissionManager(Node):
                 f'{nav_state} phase={self.phase} destination={destination}',
                 request,
             )
+            self.next_task_via_staging = True
             self._clear_active_mission()
         elif nav_state.startswith('NAVIGATION_FINISHED_STATUS_'):
             self._publish_status(
@@ -155,11 +192,27 @@ class MissionManager(Node):
                 f'{nav_state} phase={self.phase} destination={destination}',
                 request,
             )
+            self.next_task_via_staging = True
             self._clear_active_mission()
 
     def _handle_navigation_success(self) -> None:
         request = self.active_request
         if request is None:
+            return
+
+        if self.phase == 'TO_STAGING':
+            self._publish_status(
+                'ARRIVED_STAGING',
+                'safe aisle transit complete',
+                request,
+            )
+            self.phase = 'TO_RACK'
+            if self.active_rack is None:
+                self._publish_status('MISSION_FAILED', 'rack state missing', request)
+                self.next_task_via_staging = True
+                self._clear_active_mission()
+                return
+            self._publish_target(self.active_rack, 'RACK_TARGET_GENERATED')
             return
 
         if self.phase == 'TO_RACK':
@@ -187,6 +240,7 @@ class MissionManager(Node):
                 'rack pickup and packing-zone delivery completed',
                 request,
             )
+            self.next_task_via_staging = True
             self._clear_active_mission()
 
     def _publish_target(self, location: RackLocation, state: str) -> None:
@@ -208,6 +262,8 @@ class MissionManager(Node):
         self.get_logger().info(f'MODULE_COMMAND {command}')
 
     def _current_destination_name(self) -> str:
+        if self.phase == 'TO_STAGING':
+            return 'STAGING_ZONE'
         if self.phase == 'TO_RACK' and self.active_rack is not None:
             return self.active_rack.rack_id
         if self.phase == 'TO_PACKING':
@@ -252,6 +308,7 @@ class MissionManager(Node):
             'INVENTORY_ERROR',
             'BUSY',
             'MISSION_FAILED',
+            'MISSION_CANCELED',
         }:
             self.get_logger().warning(status)
         else:

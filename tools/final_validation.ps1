@@ -1,5 +1,5 @@
 param(
-    [int]$TimeoutPerMission = 210,
+    [int]$TimeoutPerMission = 240,
     [switch]$SkipRestart
 )
 
@@ -20,11 +20,6 @@ function Invoke-LoggedPowerShell {
         [string[]]$Arguments = @()
     )
 
-    # Windows PowerShell 5.1 converts text written by a child native process to
-    # stderr into ErrorRecord objects. ROS 2 commonly writes normal [INFO]
-    # messages there, so ErrorActionPreference=Stop would incorrectly abort the
-    # validation. Temporarily continue, stringify every record, and preserve the
-    # real child-process exit code.
     $previousPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
@@ -59,8 +54,9 @@ if ($preflightCode -ne 0) {
     exit 2
 }
 
-# SKU006 is first from the origin because its route exercises the right-side
-# warehouse corridor containing the visible LiDAR obstacle crate.
+# First mission proves the right-side obstacle route from the origin. Every
+# later task starts after a packing-zone delivery; Mission Manager now routes
+# those tasks through STAGING_ZONE before the requested rack.
 $Skus = @('SKU006', 'SKU001', 'SKU002', 'SKU003', 'SKU004', 'SKU005')
 $Failures = @()
 
@@ -74,6 +70,7 @@ foreach ($Sku in $Skus) {
     if ($missionCode -ne 0) {
         $Failures += $Sku
         Log-Line "RESULT ${Sku}: FAIL (exit $missionCode)"
+        Log-Line 'Mission client requested cancellation so the next SKU can continue without BUSY cascade.'
     } else {
         Log-Line "RESULT ${Sku}: PASS"
     }

@@ -8,8 +8,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 Write-Host '=== SIH26112 JUDGE DEMO ==='
-Write-Host '1/4 Starting clean autonomous stack...'
-& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'final_demo.ps1') -NoBuild
+Write-Host '1/4 Building and starting clean autonomous stack...'
+& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'final_demo.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Final stack failed to start.' }
 
 Write-Host '2/4 Opening Gazebo warehouse view...'
@@ -25,6 +25,7 @@ if ($WithRViz) {
 }
 
 Write-Host "4/4 Running autonomous warehouse mission for $Sku..."
+Write-Host 'Watch Gazebo for physical motion and RViz for the live path/costmaps.'
 Write-Host 'Start screen recording now if this is the judge capture.'
 & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'run_mission.ps1') $Sku -Timeout $Timeout
 $Result = $LASTEXITCODE

@@ -14,22 +14,47 @@ function Log-Line([string]$Text) {
     $Text | Tee-Object -FilePath $Log -Append
 }
 
+function Invoke-LoggedPowerShell {
+    param(
+        [Parameter(Mandatory=$true)][string]$ScriptPath,
+        [string[]]$Arguments = @()
+    )
+
+    # Windows PowerShell 5.1 converts text written by a child native process to
+    # stderr into ErrorRecord objects. ROS 2 commonly writes normal [INFO]
+    # messages there, so ErrorActionPreference=Stop would incorrectly abort the
+    # validation. Temporarily continue, stringify every record, and preserve the
+    # real child-process exit code.
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @Arguments 2>&1 |
+            ForEach-Object {
+                $text = $_.ToString()
+                Write-Host $text
+                Add-Content -Path $Log -Value $text
+            }
+        return $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+}
+
 Log-Line '=== SIH26112 FINAL VALIDATION ==='
 Log-Line "Started: $(Get-Date -Format s)"
 Log-Line 'Purpose: software preflight + multi-rack navigation + recovery + obstacle-route + delivery validation.'
 
 if (-not $SkipRestart) {
     Log-Line 'Building and starting a clean release-candidate stack...'
-    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'final_demo.ps1') 2>&1 |
-        Tee-Object -FilePath $Log -Append
-    if ($LASTEXITCODE -ne 0) { throw 'Final demo stack did not start cleanly.' }
+    $startCode = Invoke-LoggedPowerShell -ScriptPath (Join-Path $PSScriptRoot 'final_demo.ps1')
+    if ($startCode -ne 0) { throw 'Final demo stack did not start cleanly.' }
 }
 
 Log-Line ''
 Log-Line '--- SOFTWARE PREFLIGHT ---'
-& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'preflight.ps1') 2>&1 |
-    Tee-Object -FilePath $Log -Append
-if ($LASTEXITCODE -ne 0) {
+$preflightCode = Invoke-LoggedPowerShell -ScriptPath (Join-Path $PSScriptRoot 'preflight.ps1')
+if ($preflightCode -ne 0) {
     Log-Line 'FINAL VALIDATION RESULT: FAIL - PREFLIGHT'
     exit 2
 }
@@ -42,30 +67,45 @@ $Failures = @()
 foreach ($Sku in $Skus) {
     Log-Line ''
     Log-Line "--- VALIDATING $Sku ---"
-    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'run_mission.ps1') $Sku -Timeout $TimeoutPerMission 2>&1 |
-        Tee-Object -FilePath $Log -Append
-    if ($LASTEXITCODE -ne 0) {
+    $missionCode = Invoke-LoggedPowerShell `
+        -ScriptPath (Join-Path $PSScriptRoot 'run_mission.ps1') `
+        -Arguments @($Sku, '-Timeout', "$TimeoutPerMission")
+
+    if ($missionCode -ne 0) {
         $Failures += $Sku
-        Log-Line "RESULT ${Sku}: FAIL (exit $LASTEXITCODE)"
+        Log-Line "RESULT ${Sku}: FAIL (exit $missionCode)"
     } else {
         Log-Line "RESULT ${Sku}: PASS"
     }
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 2
 }
 
 Log-Line ''
 Log-Line '--- ROS GRAPH SNAPSHOT ---'
-& docker exec amr-ros-jazzy bash -lc 'source /opt/ros/jazzy/setup.bash && cd /workspace/AWR-Bot-/ros2_ws && source install/setup.bash && ros2 node list && echo ---TOPICS--- && ros2 topic list' 2>&1 |
-    Tee-Object -FilePath $Log -Append
+$previousPreference = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    & docker exec amr-ros-jazzy bash -lc 'source /opt/ros/jazzy/setup.bash && cd /workspace/AWR-Bot-/ros2_ws && source install/setup.bash && ros2 node list && echo ---TOPICS--- && ros2 topic list' 2>&1 |
+        ForEach-Object {
+            $text = $_.ToString()
+            Write-Host $text
+            Add-Content -Path $Log -Value $text
+        }
+}
+finally {
+    $ErrorActionPreference = $previousPreference
+}
 
 Log-Line ''
 if ($Failures.Count -eq 0) {
     Log-Line 'FINAL VALIDATION RESULT: PASS'
     Log-Line 'All six physical rack destinations completed rack pickup + packing delivery.'
     Log-Line 'Release candidate is eligible for merge/freeze.'
+    Log-Line "Evidence log: $Log"
     exit 0
 }
 
 Log-Line "FINAL VALIDATION RESULT: FAIL - $($Failures -join ', ')"
 Log-Line 'Do not merge/freeze until the failed missions are resolved.'
+Log-Line "Evidence log: $Log"
 exit 2

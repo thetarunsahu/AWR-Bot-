@@ -46,9 +46,9 @@ foreach ($Sku in $Skus) {
         Tee-Object -FilePath $Log -Append
     if ($LASTEXITCODE -ne 0) {
         $Failures += $Sku
-        Log-Line "RESULT $Sku: FAIL (exit $LASTEXITCODE)"
+        Log-Line "RESULT ${Sku}: FAIL (exit $LASTEXITCODE)"
     } else {
-        Log-Line "RESULT $Sku: PASS"
+        Log-Line "RESULT ${Sku}: PASS"
     }
     Start-Sleep -Seconds 3
 }

@@ -64,6 +64,14 @@ racks:
     y: -1.7
     yaw: -1.5707963267948966
 
+  # Safe transit point in the gap between the lower rack row. After a completed
+  # delivery the AMR starts near the packing zone, so the next mission first
+  # returns through this staging point before requesting the rack target.
+  STAGING_ZONE:
+    x: 3.5
+    y: -1.8
+    yaw: 0.0
+
   # Final destination inside the green packing-zone marker.
   PACKING_ZONE:
     x: 9.0

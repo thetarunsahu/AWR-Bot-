@@ -22,10 +22,6 @@ def generate_launch_description() -> LaunchDescription:
     amr_nav_share = get_package_share_directory('amr_navigation')
     params_file = os.path.join(amr_nav_share, 'config', 'nav2_params.yaml')
 
-    # Keep the demo stack deliberately small. Jazzy's stock navigation_launch.py
-    # also starts route, docking and collision-monitor servers; those are not
-    # needed for our SKU -> rack NavigateToPose demo and make lifecycle startup
-    # depend on unrelated configuration.
     controller = nav2_node(
         'nav2_controller', 'controller_server', 'controller_server', params_file
     )
@@ -67,8 +63,11 @@ def generate_launch_description() -> LaunchDescription:
         output='screen',
         parameters=[{
             'use_sim_time': True,
-            'max_retries': 2,
+            'max_retries': 1,
             'retry_delay_sec': 1.0,
+            'goal_timeout_sec': 180.0,
+            'no_progress_timeout_sec': 30.0,
+            'progress_epsilon_m': 0.10,
         }],
     )
 

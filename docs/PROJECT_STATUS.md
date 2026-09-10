@@ -2,6 +2,10 @@
 
 Last structured baseline: initial Yashraj handover + repository architecture setup.
 
+Mission-layer update: independent SKU-to-rack target generation added under
+`ros2_ws/src/amr_mission_manager/`; ROS 2 Jazzy build and runtime verification
+remain pending in a ROS-enabled environment.
+
 ## Status Legend
 
 - ✅ implemented / verified
@@ -29,7 +33,18 @@ Last structured baseline: initial Yashraj handover + repository architecture set
 | Obstacle avoidance | ❌ | pending |
 | SLAM | ❌ | pending |
 | Nav2 | ❌ | pending |
-| Warehouse mission logic | ❌ | pending |
+| Warehouse inventory and target generation | 🟡 | `amr_mission_manager` implemented with YAML validation, task/status topics, `PoseStamped` output, launch, demo, and tests; Jazzy build/runtime verification pending |
+| Mission execution / Nav2 adapter | ❌ | target-to-`NavigateToPose` adapter, goal lifecycle, task correlation, docking, and payload actions pending |
+
+### Mission Layer Validation Scope
+
+The independent package implements request validation, SKU/rack resolution,
+map-frame target generation, and processing statuses. It includes pure Python
+unit tests and a ROS topic integration test; the latter requires ROS 2. See the
+[package README](../ros2_ws/src/amr_mission_manager/README.md) for repeatable build,
+test, launch, and demo commands. A generated target is not evidence of robot
+movement, navigation success, or delivery completion. Existing simulation,
+SLAM/Nav2, and M1 statuses are unchanged.
 
 ## Current Simulation Issues to Resolve
 

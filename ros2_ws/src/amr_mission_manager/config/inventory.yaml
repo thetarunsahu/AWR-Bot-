@@ -1,0 +1,79 @@
+# SIH26112 demo inventory aligned with the Gazebo warehouse.
+# The AMR spawns at world/map origin, so these are direct warehouse coordinates.
+# Rack poses are deliberately placed well inside aisle free-space rather than at
+# rack collision edges. This gives Nav2 extra inflation / localization margin
+# while still stopping the robot directly in front of the requested rack.
+items:
+  SKU001:
+    name: "Laptop"
+    rack: "RACK_A"
+  SKU002:
+    name: "Keyboard"
+    rack: "RACK_B"
+  SKU003:
+    name: "Mouse"
+    rack: "RACK_C"
+  SKU004:
+    name: "Monitor"
+    rack: "RACK_D"
+  SKU005:
+    name: "USB Cable"
+    rack: "RACK_E"
+  SKU006:
+    name: "Power Adapter"
+    rack: "RACK_F"
+  SKU007:
+    name: "Barcode Scanner"
+    rack: "RACK_A"
+  SKU008:
+    name: "Label Printer"
+    rack: "RACK_C"
+  SKU009:
+    name: "Packing Tape"
+    rack: "RACK_E"
+  SKU010:
+    name: "Shipping Box"
+    rack: "RACK_F"
+
+racks:
+  # Upper row rack front edge is near y=3.5. Stop at y=2.2, facing north.
+  RACK_A:
+    x: -7.0
+    y: 2.2
+    yaw: 1.5707963267948966
+  RACK_B:
+    x: 0.0
+    y: 2.2
+    yaw: 1.5707963267948966
+  RACK_C:
+    x: 7.0
+    y: 2.2
+    yaw: 1.5707963267948966
+
+  # Lower row rack front edge is near y=-3.0. Stop at y=-1.7, facing south.
+  RACK_D:
+    x: -7.0
+    y: -1.7
+    yaw: -1.5707963267948966
+  RACK_E:
+    x: 0.0
+    y: -1.7
+    yaw: -1.5707963267948966
+  RACK_F:
+    x: 7.0
+    y: -1.7
+    yaw: -1.5707963267948966
+
+  # Safe transit point in the gap between the lower rack row. After a completed
+  # delivery the AMR starts near the packing zone, so the next mission first
+  # returns through this staging point before requesting the rack target.
+  STAGING_ZONE:
+    x: 3.5
+    y: -1.8
+    yaw: 0.0
+
+  # Final destination inside the green packing-zone marker.
+  PACKING_ZONE:
+    x: 9.0
+    y: -7.5
+    yaw: 0.0

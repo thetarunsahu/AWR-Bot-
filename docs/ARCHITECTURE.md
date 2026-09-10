@@ -109,7 +109,8 @@ The first functional module will be a **bin / pallet handling attachment**.
 
 ## 4. ROS 2 Architecture
 
-Planned package split:
+Package split (`amr_mission_manager` is implemented; the other packages remain
+planned):
 
 ```text
 ros2_ws/src/
@@ -118,7 +119,7 @@ ros2_ws/src/
 ├── amr_simulation/        # Gazebo-specific integration
 ├── amr_navigation/        # Nav2, maps, planner configuration
 ├── amr_control/           # base control / hardware interface
-└── amr_missions/          # warehouse missions and docking logic
+└── amr_mission_manager/   # SKU/rack resolution and target-pose publication
 ```
 
 ### Core Topics / Interfaces
@@ -134,6 +135,53 @@ ros2_ws/src/
 ```
 
 Topic names may change during implementation, but should be standardized before Nav2 integration.
+
+### Warehouse Mission and Inventory Layer
+
+[`amr_mission_manager`](../ros2_ws/src/amr_mission_manager/README.md) is an
+independent ROS 2 Jazzy `ament_python` package. Its current boundary is target
+generation:
+
+```text
+Warehouse task: {task_id, sku, action: "DELIVER"}
+              |
+              v
+/amr/task_request (std_msgs/String)
+              |
+              v
+Request validation -> inventory.yaml: SKU -> rack ID -> x, y, yaw
+              |
+              v
+Mission manager -> map-frame PoseStamped with ROS timestamp
+              |
+              +--> /amr/mission_status (std_msgs/String)
+              |
+              v
+/amr/target_pose (geometry_msgs/PoseStamped)
+              |
+              v
+Future adapter -> Nav2 NavigateToPose action
+```
+
+`inventory_manager.py` owns YAML loading, validation, and item/rack lookups.
+`mission_logic.py` handles request validation and yaw-to-quaternion conversion
+without ROS dependencies. The node owns ROS transport, timestamps, parameters,
+and logging. Invalid requests or unknown SKUs produce a diagnostic status and
+no target; invalid inventory prevents startup.
+
+The three mission topics use reliable, volatile QoS with depth 10. A valid task
+produces `TASK_RECEIVED`, `SKU_RESOLVED`, and `TARGET_GENERATED`; failure states
+are `INVALID_REQUEST` and `INVALID_SKU`. `TARGET_GENERATED` means a pose was
+published, not that the robot reached it. `DELIVER` currently selects a rack
+target only. Sample rack coordinates must be replaced with reachable approach
+poses in the actual map before navigation.
+
+The package has no Nav2, Gazebo, SLAM, or motor-control dependency. A future
+adapter can assign each received pose to `NavigateToPose.Goal.pose`, owning
+navigation readiness, admission, feedback, cancellation, and results.
+`PoseStamped` has no task identifier, so task/action UUID correlation must be
+designed before concurrent mission execution. This work does not change the
+motion-first integration order or implement docking/module actions.
 
 ---
 

@@ -38,6 +38,31 @@ Use this file for decisions that affect more than one project track.
 
 **Status:** Frozen.
 
+## D-007 — Warehouse Mission Interface
+
+**Decision:** Implement the inventory/mission layer in the independent
+`amr_mission_manager` ROS 2 Jazzy package. Accept JSON containing nonempty
+`task_id`, `sku`, and `action` strings on `/amr/task_request` (`std_msgs/String`);
+the initial supported action is `DELIVER`. Resolve the SKU through YAML rack
+coordinates and publish `/amr/target_pose` (`geometry_msgs/PoseStamped`) in
+`map`, with diagnostic strings on `/amr/mission_status` (`std_msgs/String`).
+These topics use reliable, volatile QoS with depth 10.
+
+**Reason:** Warehouse task resolution can be developed and tested independently
+of the robot model and navigation stack.
+
+**Impact:** The later Nav2 adapter consumes the target pose and sets
+`NavigateToPose.Goal.pose`. It must define task/action UUID correlation and own
+goal admission, feedback, cancellation, and completion. Pose publication does
+not mean delivery execution. Sample inventory coordinates are not frozen
+warehouse-map positions. Yashraj's handover and the D-006 integration order
+remain unchanged.
+
+**Status:** Implemented interface; ROS 2 runtime verification and navigation
+adapter integration pending.
+
+**Date:** 2026-09-08.
+
 ---
 
 # Parameters Awaiting Freeze

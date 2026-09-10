@@ -65,9 +65,12 @@ def generate_launch_description() -> LaunchDescription:
             'use_sim_time': True,
             'max_retries': 1,
             'retry_delay_sec': 1.0,
-            'goal_timeout_sec': 180.0,
-            'no_progress_timeout_sec': 30.0,
-            'progress_epsilon_m': 0.10,
+            'goal_timeout_sec': 240.0,
+            # RPP may rotate in place before translating on long aisle goals.
+            # Keep this watchdog looser than the controller progress checker so
+            # it does not cancel a healthy heading-alignment phase.
+            'no_progress_timeout_sec': 85.0,
+            'progress_epsilon_m': 0.05,
         }],
     )
 

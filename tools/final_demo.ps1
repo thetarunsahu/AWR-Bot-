@@ -124,7 +124,7 @@ if ($missing.Count -gt 0) {
 $requiredTopics = @(
     '/map', '/scan', '/odom', '/cmd_vel',
     '/amr/task_request', '/amr/mission_status', '/amr/navigation_status',
-    '/amr/module_command'
+    '/amr/module_command', '/amr/cancel_request', '/amr/navigation_cancel'
 )
 $missingTopics = @($requiredTopics | Where-Object { $topics -notcontains $_ })
 if ($missingTopics.Count -gt 0) {
@@ -144,7 +144,7 @@ if ($missingServices.Count -gt 0) {
 
 Write-Host ''
 Write-Host 'FINAL STACK READY.'
-Write-Host 'Recovery layer: costmap clear + bounded Nav2 retries enabled.'
+Write-Host 'Recovery layer: staging transit + watchdog + costmap clear + bounded retry + clean cancellation enabled.'
 Write-Host 'Run a mission from another PowerShell:'
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\tools\run_mission.ps1 SKU004'
 Write-Host 'To open Gazebo GUI:'

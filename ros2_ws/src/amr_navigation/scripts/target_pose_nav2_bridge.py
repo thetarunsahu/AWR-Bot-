@@ -96,6 +96,7 @@ class TargetPoseNav2Bridge(Node):
         self._goal_generation += 1
         self._retry_count = 0
         self._last_pose = target
+        self._cancel_for_retry = False
         self._send_goal(target, self._goal_generation)
 
     def _send_goal(self, pose: PoseStamped, generation: int) -> None:
@@ -107,6 +108,7 @@ class TargetPoseNav2Bridge(Node):
         goal = NavigateToPose.Goal()
         goal.pose = target
 
+        self._cancel_for_retry = False
         self._publish_status('NAVIGATION_GOAL_SENT')
         future = self._client.send_goal_async(
             goal,
@@ -135,7 +137,6 @@ class TargetPoseNav2Bridge(Node):
         self._attempt_started = now
         self._last_progress = now
         self._best_distance = None
-        self._cancel_for_retry = False
         self._start_watchdog(generation)
         self._publish_status('NAVIGATION_ACTIVE')
         result_future = goal_handle.get_result_async()
@@ -198,7 +199,9 @@ class TargetPoseNav2Bridge(Node):
         if generation != self._goal_generation:
             return
         self._active_goal = None
-        self._cancel_for_retry = False
+        # Keep _cancel_for_retry true until the next generation is sent. This
+        # prevents the cancelled result callback from being mistaken for an
+        # operator cancellation while the retry timer is pending.
         self.get_logger().warning(f'Nav2 goal cancelled for retry: {reason}')
         self._recover_or_abort(generation, reason=reason)
 
@@ -208,6 +211,8 @@ class TargetPoseNav2Bridge(Node):
         goal_handle: ClientGoalHandle,
         generation: int,
     ) -> None:
+        # A retry gets a new generation, so late results from a cancelled prior
+        # attempt are ignored deterministically.
         if generation != self._goal_generation:
             return
 
@@ -217,12 +222,13 @@ class TargetPoseNav2Bridge(Node):
             self.get_logger().error(f'NavigateToPose result failed: {exc}')
             status = 6
 
-        if self._active_goal == goal_handle:
+        # Use identity rather than ClientGoalHandle.__eq__. rclpy's equality
+        # implementation dereferences other.goal_id and crashes when the active
+        # handle has already been cleared by the cancellation callback.
+        if self._active_goal is goal_handle:
             self._active_goal = None
         self._stop_watchdog()
 
-        # A status=5 result is expected while the watchdog is deliberately
-        # cancelling a stuck goal. The cancel callback owns the retry path.
         if status == 5 and self._cancel_for_retry:
             return
 
@@ -239,6 +245,7 @@ class TargetPoseNav2Bridge(Node):
     def _recover_or_abort(self, generation: int, reason: str) -> None:
         """Clear stale costmaps and retry a bounded number of times."""
         if self._last_pose is None or self._retry_count >= self._max_retries:
+            self._cancel_for_retry = False
             self._publish_status('NAVIGATION_ABORTED')
             return
 
@@ -273,7 +280,12 @@ class TargetPoseNav2Bridge(Node):
                 self.destroy_timer(self._retry_timer)
                 self._retry_timer = None
             if generation == self._goal_generation and self._last_pose is not None:
-                self._send_goal(self._last_pose, generation)
+                # Give the retry a new generation. Any late callback from the
+                # cancelled attempt can no longer alter the new attempt state.
+                self._goal_generation += 1
+                new_generation = self._goal_generation
+                self._cancel_for_retry = False
+                self._send_goal(self._last_pose, new_generation)
 
         self._retry_timer = self.create_timer(self._retry_delay, retry_once)
 

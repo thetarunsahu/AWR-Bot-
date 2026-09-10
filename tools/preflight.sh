@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 source /opt/ros/jazzy/setup.bash
 cd /workspace/AWR-Bot-/ros2_ws
